@@ -93,10 +93,10 @@ const createSession = function(id, description) {
   client.on('message', msg => {
     
     console.log(msg);
-    if (msg.body == '!ping') {
-      msg.reply('pong');
+    if (msg.body == '!hi') {
+      msg.reply('hello');
     } else if (msg.body == 'good morning') {
-      msg.reply('selamat pagi');
+      msg.reply('same to you');
     } else if (msg.body == '!groups') {
       client.getChats().then(chats => {
         const groups = chats.filter(chat => chat.isGroup);
