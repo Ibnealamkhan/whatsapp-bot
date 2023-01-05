@@ -36,6 +36,9 @@ app.get('/', (req, res) => {
   });
 });
 
+
+
+
 const sessions = [];
 const SESSIONS_FILE = './whatsapp-sessions.json';
 
@@ -86,7 +89,81 @@ const createSession = function(id, description) {
     })
   });
 
+
+  client.on('message', msg => {
+    
+    console.log(msg);
+    if (msg.body == '!ping') {
+      msg.reply('pong');
+    } else if (msg.body == 'good morning') {
+      msg.reply('selamat pagi');
+    } else if (msg.body == '!groups') {
+      client.getChats().then(chats => {
+        const groups = chats.filter(chat => chat.isGroup);
+  
+        if (groups.length == 0) {
+          msg.reply('You have no group yet.');
+        } else {
+          let replyMsg = '*YOUR GROUPS*\n\n';
+          groups.forEach((group, i) => {
+            replyMsg += `ID: ${group.id._serialized}\nName: ${group.name}\n\n`;
+          });
+          replyMsg += '_You can use the group id to send a message to the group._'
+          msg.reply(replyMsg);
+        }
+      });
+    } else {
+      if(msg.body=='device'){
+        msg.reply(msg.deviceType);
+      }
+    }
+  
+    // NOTE!
+    // UNCOMMENT THE SCRIPT BELOW IF YOU WANT TO SAVE THE MESSAGE MEDIA FILES
+    // Downloading media
+    // if (msg.hasMedia) {
+    //   msg.downloadMedia().then(media => {
+    //     // To better understanding
+    //     // Please look at the console what data we get
+    //     console.log(media);
+  
+    //     if (media) {
+    //       // The folder to store: change as you want!
+    //       // Create if not exists
+    //       const mediaPath = './downloaded-media/';
+  
+    //       if (!fs.existsSync(mediaPath)) {
+    //         fs.mkdirSync(mediaPath);
+    //       }
+  
+    //       // Get the file extension by mime-type
+    //       const extension = mime.extension(media.mimetype);
+          
+    //       // Filename: change as you want! 
+    //       // I will use the time for this example
+    //       // Why not use media.filename? Because the value is not certain exists
+    //       const filename = new Date().getTime();
+  
+    //       const fullFilename = mediaPath + filename + '.' + extension;
+  
+    //       // Save to file
+    //       try {
+    //         fs.writeFileSync(fullFilename, media.data, { encoding: 'base64' }); 
+    //         console.log('File downloaded successfully!', fullFilename);
+    //       } catch (err) {
+    //         console.log('Failed to save the file:', err);
+    //       }
+    //     }
+    //   });
+    // }
+  });
+  
   client.initialize();
+
+
+  client.on('loading_screen', (percent, message) => {
+    console.log('LOADING SCREEN', percent, message);
+});
 
   client.on('qr', (qr) => {
     console.log('QR RECEIVED', qr);
@@ -189,7 +266,7 @@ io.on('connection', function(socket) {
 
 // Send message
 app.post('/send-message', async (req, res) => {
-  console.log(req);
+ // console.log(req);
 
   const sender = req.body.sender;
   const number = phoneNumberFormatter(req.body.number);
@@ -233,6 +310,52 @@ app.post('/send-message', async (req, res) => {
     });
   });
 });
+
+
+app.get("/sms", async (req, res) => {
+  
+  var sender = req.query.sender
+  var number = phoneNumberFormatter(req.query.number);
+  var message = req.query.message;
+
+  const client = sessions.find(sess => sess.id == sender)?.client;
+
+  // Make sure the sender is exists & ready
+  if (!client) {
+    return res.status(422).json({
+      status: false,
+      message: `The sender: ${sender} is not found!`
+    })
+  }
+
+  /**
+   * Check if the number is already registered
+   * Copied from app.js
+   * 
+   * Please check app.js for more validations example
+   * You can add the same here!
+   */
+  const isRegisteredNumber = await client.isRegisteredUser(number);
+
+  if (!isRegisteredNumber) {
+    return res.status(422).json({
+      status: false,
+      message: 'The number is not registered'
+    });
+  }
+
+  client.sendMessage(number, message).then(response => {
+    res.status(200).json({
+      status: true,
+      response: response
+    });
+  }).catch(err => {
+    res.status(500).json({
+      status: false,
+      response: err
+    });
+  });
+})
 
 server.listen(port, function() {
   console.log('App running on *: ' + port);
